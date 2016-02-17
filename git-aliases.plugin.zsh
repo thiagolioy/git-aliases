@@ -1,52 +1,73 @@
-__define_git_completion () {
-  eval "
-      _git_$2_shortcut () {
-          COMP_LINE=\"git $2\${COMP_LINE#$1}\"
-          let COMP_POINT+=$((4+${#2}-${#1}))
-          COMP_WORDS=(git $2 \"\${COMP_WORDS[@]:1}\")
-          let COMP_CWORD+=1
-          local cur words cword prev
-         _get_comp_words_by_ref -n =: cur words cword prev
-         _git_$2
-      }
-  "
+pull_or_push() {
+  if [ $# -eq 2 ]; then
+    git $1 $2 `git rev-parse --abbrev-ref HEAD`
+  else
+    git $1 origin `git rev-parse --abbrev-ref HEAD`
+  fi
 }
+pull() { pull_or_push "pull" $@ }
+push() { pull_or_push "push" $@ }
 
-__gitshortcut () {
-    type _git_$2_shortcut &>/dev/null || __define_git_completion $1 $2
-    alias $1="git $2 $3"
-    complete -o default -o nospace -F _git_$2_shortcut $1
-}
-
-
-# GIT
-__gitshortcut  gp       push
+alias gf='git fetch'
 alias gpo="git push origin"
 alias gpom="git push origin master"
-alias gpod="git push origin devel"
-__gitshortcut  gl       pull
 alias glo="git pull origin"
 alias glom="git pull origin master"
-alias glod="git pull origin devel"
-__gitshortcut  glr      pull --rebase
-__gitshortcut  glro     pull '--rebase origin'
-__gitshortcut  glrom    pull '--rebase origin master'
-__gitshortcut  glrod    pull '--rebase origin devel'
-__gitshortcut  gc       commit
-__gitshortcut  gca      commit -a
-__gitshortcut  gco      checkout
-alias gcom="git checkout master"
-alias gcod="git checkout devel"
-__gitshortcut  gb       branch
-__gitshortcut  gm       merge
-__gitshortcut  gs       status
-__gitshortcut  gd       diff
-__gitshortcut  ga       add
-__gitshortcut  gf       fetch
-__gitshortcut  gr       reset
-__gitshortcut  gst      stash
-alias gstp="git stash pop"
-alias gmm="git merge master"
-alias gmd="git merge devel"
-alias grs="git reset --soft"
-alias grh="git reset --hard"
+alias gb='git branch'
+alias grh='git reset --hard'
+alias glog="git log --oneline --decorate"
+
+status() {
+  if [ "$GIT_ALIASES_SHORTER_GIT_STATUS" -ne 1 ]; then; git status
+  else; git status -sb; fi
+}
+alias gs='status'
+
+co() {
+  git fetch
+  git checkout "$1"
+  if [ "$GIT_ALIASES_SILENCE_GIT_STATUS" -ne 1 ]; then; git status; fi
+}
+compdef _git co=git-checkout
+
+cob() {
+  git checkout -b "$1"
+  if [ "$GIT_ALIASES_AUTOPUSH_NEW_BRANCH" -eq 1 ]; then
+    git add "$(git rev-parse --show-toplevel)" && git commit -a -m "Started $1" && push
+  fi
+}
+
+cobm() {
+  git checkout master && pull && git checkout -b "$1"
+}
+
+corbm() {
+  corp master && git checkout -b "$1"
+}
+
+cop() {
+  git fetch && git checkout "$1" && pull && git fetch
+  if [ "$GIT_ALIASES_SILENCE_GIT_STATUS" -ne 1 ]; then; git status; fi
+}
+compdef _git cop=git-checkout
+
+
+corp() {
+  co "$1" && rp
+}
+compdef _git corp=git-checkout
+
+
+
+
+gd() {
+  if [ "$GIT_ALIASES_ICDIFF" -eq 1 ]; then; git icdiff
+  elif [ "$GIT_ALIASES_ICDIFF" -eq 2 ]; then; git difftool --extcmd icdiff
+  else; git diff; fi
+  git status
+}
+
+
+prune() {
+  git branch -D "$1" && git push origin --delete "$1"
+}
